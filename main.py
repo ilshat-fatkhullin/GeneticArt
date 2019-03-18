@@ -7,10 +7,10 @@ import random as rand
 # CONSTANTS
 IMAGE_WIDTH = 512
 IMAGE_HEIGHT = 512
-MUTATION = 2
-GENERATION_SIZE = 10
+MUTATION = 1
+GENERATION_SIZE = 100
 ITERATIONS_NUMBER = 1000000000
-SAVE_ITERATION = 250
+SAVE_ITERATION = 50
 
 input_image = mpimg.imread('input.png')
 plt.imshow(input_image)
@@ -31,14 +31,24 @@ def get_fitness(image):
     return np.sum((image - style_image) ** 2)
 
 
+#def add_mutation(image):
+#    for i in range(MUTATION):
+#        cv.circle(image,
+#                  (rand.randint(0, IMAGE_WIDTH),
+#                   rand.randint(0, IMAGE_HEIGHT)),
+#                  1,
+#                  (rand.uniform(0, 1), rand.randint(0, 1), rand.randint(0, 1)),
+#                  2)
+
+
 def add_mutation(image):
     for i in range(MUTATION):
-        cv.circle(image,
-                  (rand.randint(0, IMAGE_WIDTH),
-                   rand.randint(0, IMAGE_HEIGHT)),
-                  1,
-                  (rand.uniform(0, 1), rand.randint(0, 1), rand.randint(0, 1)),
-                  2)
+        p_1 = np.random.randint(0, IMAGE_WIDTH, 2)
+        p_2 = np.random.randint(0, IMAGE_WIDTH, 2)
+        cv.line(image,
+                (p_1[0], p_1[1]),
+                (p_2[0], p_2[1]),
+                np.random.uniform(0, 1, 3))
 
 
 def cross_images(img_a, img_b):
