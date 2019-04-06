@@ -1,0 +1,3 @@
+[console_scripts]
+sp = sp:sp_main
+
