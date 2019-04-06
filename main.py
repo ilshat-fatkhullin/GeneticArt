@@ -4,45 +4,68 @@ from copy import deepcopy
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageChops
+from skimage.measure import compare_mse
+
+
+# READING INPUTS
 
 input_image = Image.open('./inputs/input.jpg').convert('RGBA')
 
+word_array = []
+
+for line in open('words.txt', 'r').readlines():
+    for w in line.split():
+        filtered_word = re.sub('[!@#$;:,.\n]', '', w)
+        if len(filtered_word) > 0:
+            word_array.append(filtered_word)
+
+fonts = [ImageFont.truetype("./fonts/Pacifico-Regular.ttf", 20)]
+
 # CONSTANTS
+
 IMAGE_WIDTH = input_image.size[0]
 IMAGE_HEIGHT = input_image.size[1]
-TEXT_MUTATION = 1
+TEXT_MUTATION_RATE = 1
 
-LINE_MUTATION = 1
+LINE_MUTATION_RATE = 1
 LINE_LENGTH = 50
 LINE_WIDTH = 1
 
-ELLIPSE_MUTATION = 1
+CIRCLE_MUTATION_RATE = 1
 CIRCLE_RADIUS = 10
 
-GENERATION_SIZE = 25
-ITERATIONS_NUMBER = 1000000000
-SAVE_ITERATION = 50
+POPULATION_SIZE = 25
+NUMBER_OF_ITERATIONS = 3000
+SAVING_ITERATION_INDEX = 50
 
 RANDOM_CACHE_SIZE = 1000
 
 
 def create_image():
-    return Image.new('RGBA', (IMAGE_WIDTH, IMAGE_HEIGHT), (255, 255, 255))
+    return Image.new('RGBA', (IMAGE_WIDTH, IMAGE_HEIGHT), (0, 0, 0, 255))
 
 
-# Calculate the root-mean-square difference between two images
-def rms_difference(im1, im2):
-    diff = ImageChops.difference(im1, im2)
-    h = diff.histogram()
-    sq = (value * ((idx % 256) ** 2) for idx, value in enumerate(h))
-    sum_of_squares = np.sum(sq)
-    rms = sum_of_squares / float(im1.size[0] * im1.size[1])
+# FITNESS FUNCTIONS
+
+def rms_difference(image_1, image_2):
+    difference = ImageChops.difference(image_1, image_2)
+    histogram = difference.histogram()
+    squares = (value * ((index % 256) ** 2) for index, value in enumerate(histogram))
+    sum_of_squares = np.sum(squares)
+    rms = sum_of_squares / float(image_1.size[0] * image_1.size[1])
     return rms
 
 
+def ms_error(image_1, image_2):
+    return compare_mse(np.asarray(image_1), np.asarray(image_2))
+
+
 def get_fitness(image):
+    # return ms_error(image, input_image)
     return rms_difference(image, input_image)
 
+
+# RANDOM OPTIMIZERS
 
 def get_random(random_array, random_counter, min_value, max_value, shape):
     if random_array is None:
@@ -121,6 +144,8 @@ def get_random_word():
     return word_array[result]
 
 
+# MUTATION FUNCTIONS
+
 def add_text_mutation(image, mutation):
     for i in range(mutation):
         word = get_random_word()
@@ -141,7 +166,8 @@ def add_line_mutation(image, mutation):
     draw = ImageDraw.Draw(image)
     for i in range(mutation):
         color = np.random.randint(0, 256, 3)
-        draw.line([(get_random_x(), get_random_y()), (get_random_x(), get_random_y())], (color[0], color[1], color[2], 255), LINE_WIDTH)
+        draw.line([(get_random_x(), get_random_y()), (get_random_x(), get_random_y())],
+                  (color[0], color[1], color[2], 255), LINE_WIDTH)
     return image
 
 
@@ -160,8 +186,10 @@ def cross_images(img_a, img_b):
     return Image.blend(img_a, img_b, 0.5)
 
 
-def learn_until_fitness(min_fitness, mutation_function, mutation):
-    generation = list()
+# LEARNING FUNCTION
+
+def learn(min_fitness, mutation_function, mutation):
+    population = list()
 
     try:
         cash_image = Image.open('./outputs/output.png').convert('RGBA')
@@ -171,14 +199,15 @@ def learn_until_fitness(min_fitness, mutation_function, mutation):
     if get_fitness(cash_image) < min_fitness:
         return
 
-    for i in range(GENERATION_SIZE):
-        generation.append(deepcopy(cash_image))
+    for i in range(POPULATION_SIZE):
+        population.append(deepcopy(cash_image))
 
     best = None
     pre_best = None
-    for i in range(ITERATIONS_NUMBER):
+    for i in range(NUMBER_OF_ITERATIONS):
         best_fitness = sys.float_info.max
-        for individual in generation:
+
+        for individual in population:
             current_fitness = get_fitness(individual)
 
             if individual is best:
@@ -189,40 +218,31 @@ def learn_until_fitness(min_fitness, mutation_function, mutation):
                 best = individual
                 best_fitness = current_fitness
 
-        new_generation = list()
-        new_generation.append(best)
-        new_generation.append(pre_best)
+        new_population = list()
+        new_population.append(best)
+        new_population.append(pre_best)
 
-        generation.remove(best)
-        if pre_best in generation:
-            generation.remove(pre_best)
+        population.remove(best)
+        if pre_best in population:
+            population.remove(pre_best)
 
         cross = cross_images(best, pre_best)
 
-        for individual in generation:
-            new_generation.append(mutation_function(deepcopy(cross), mutation))
+        for individual in population:
+            new_population.append(mutation_function(deepcopy(cross), mutation))
 
-        generation = new_generation
+        population = new_population
 
-        if i % SAVE_ITERATION == 0:
+        if i % SAVING_ITERATION_INDEX == 0:
             best.save('./outputs/output.png')
-            print('Iteration: ' + str(i) + '. Fitness: ' + str(best_fitness) + ' Size of generation ' + str(len(generation)))
+            print('Iteration: ' + str(i) + '. Fitness: ' + str(best_fitness))
+
             if best_fitness < min_fitness:
-                return
-            if i == 6000:
                 return
 
     best.save('./outputs/output.png')
 
 
-word_array = []
-
-for line in open('words.txt', 'r').readlines():
-    for w in line.split():
-        filtered_word = re.sub('[!@#$;:,.\n]', '', w)
-        if len(filtered_word) > 0:
-            word_array.append(filtered_word)
-
-fonts = [ImageFont.truetype("./fonts/Pacifico-Regular.ttf", 20)]
-
-learn_until_fitness(3000, add_text_mutation, TEXT_MUTATION)
+learn(1000, add_text_mutation, TEXT_MUTATION_RATE)
+# learn(1000, add_line_mutation, LINE_MUTATION_RATE)
+# learn(1000, add_circle_mutation, CIRCLE_MUTATION_RATE)
