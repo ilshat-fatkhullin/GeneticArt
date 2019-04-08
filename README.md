@@ -6,3 +6,6 @@ How to use:
 3. Choose any mutation method that you want (they are listed in the end of main.py).
 4. Set some custom settings in 'Constants' section, if you want.
 5. Run main.py.
+
+### Install all dependencies by command:
+pip3 install -r requirements.txt
